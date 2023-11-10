@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Conbhuide - Celtic knots from Conway's Game of Life</title>
+    <style>
+        html,
+        body,
+        canvas {
+            margin: 0px;
+            padding: 0px;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: absolute;
+            background: black;
+            z-index: 0;
+        }
+    </style>
+  </head>
+  <body>
+    <div id="ui"></div>
+    <canvas id="glcanvas" tabindex='1'><!-- style="outline: none" height="600" width="600">-->
+      Your browser does not support the Canvas.
+    </canvas>
+    <script src="https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"></script> <!-- gl.js from miniquad repo (native/sapp-wasm/js/gl.js) -->
+    <!--<script src="https://not-fl3.github.io/miniquad-samples/sapp_jsutils.js"></script> gl.js from miniquad repo (native/sapp-wasm/js/gl.js) -->
+    <!--<script src="celtic.js"></script> Initial JS implementation of Celtic Knots comes from https://w-shadow.com/celtic-knots/ --> 
+    <script>load("conbhuide.wasm");</script> <!-- Your compiled wasm file -->
+  </body>
+</html>

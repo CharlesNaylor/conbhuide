@@ -1,0 +1,17 @@
+# You must change these to your own details.
+[package]
+name = "conbhuide"
+description = "Draw celtic knots based on Conway's Game of Life"
+version = "0.1.0"
+authors = ["Charles <cnaylor@gmail.com>"]
+categories = ["wasm"]
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+macroquad = "0.4.4"
+sapp-wasm = "0.1.23"
+
+[dependencies.web-sys]
+version = "0.3.22"
+features = ["console", "HtmlCanvasElement"]
