@@ -2,6 +2,7 @@
  * Main file for compiling to wasm
  */
 use macroquad::prelude::*;
+use macroquad::rand::gen_range;
 
 const CELL_SIZE: u16 = 25;
 
@@ -12,7 +13,7 @@ struct CellMatrix {
     cells: Vec<bool>,
 }
 impl CellMatrix {
-    fn new(screen_width: u16, screen_height: u16, cell_size: u16) -> Self {
+    pub fn new(screen_width: u16, screen_height: u16, cell_size: u16) -> Self {
         let width = screen_width / cell_size;
         let height = screen_height / cell_size;
         CellMatrix {
@@ -20,6 +21,13 @@ impl CellMatrix {
             height,
             cell_size,
             cells: vec![false; (width * height) as usize],
+        }
+    }
+
+    pub fn randomize(&mut self, living_fraction: Option<f32>) {
+        /* Add random live cells at rate living_fraction */
+        for i in 0..self.cells.len() {
+            self.cells[i] = gen_range(0, (1.0 / living_fraction.unwrap_or(0.2)) as i32) == 0;
         }
     }
 
@@ -44,8 +52,8 @@ impl CellMatrix {
     fn draw_cell(&self, x: u16, y: u16) {
         /* draw a rectangle for a given cell reference at the appropriate place in the image*/
         draw_rectangle(
-            ((x - 1) * self.cell_size).into(),
-            ((y - 1) * self.cell_size).into(),
+            (((x as i16) - 1) * self.cell_size as i16).into(),
+            (((y as i16) - 1) * self.cell_size as i16).into(),
             self.cell_size.into(),
             self.cell_size.into(),
             if self.cell_is_alive(x, y) {
@@ -106,6 +114,7 @@ impl CellMatrix {
 async fn main() {
     let mut cell_matrix: CellMatrix =
         CellMatrix::new(screen_width() as u16, screen_height() as u16, CELL_SIZE);
+    cell_matrix.randomize(None);
     info!(
         "{} by {} canvas, for {} by {} cells",
         screen_height(),
