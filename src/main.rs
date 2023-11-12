@@ -3,43 +3,74 @@
  */
 use macroquad::prelude::*;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum CellState {
-    Alive,
-    Dead,
+const CELL_SIZE: u16 = 25;
+
+struct CellMatrix {
+    width: u16,
+    height: u16,
+    cell_size: u16,
+    cells: Vec<bool>,
 }
-
-#[macroquad::main("Conbhuide")]
-async fn main() {
-    let w = screen_width() as usize;
-    let h = screen_height() as usize;
-    info!("{} by {} canvas", w, h);
-
-    let mut cells = vec![CellState::Dead; w * h];
-    let mut buffer = vec![CellState::Dead; w * h];
-
-    let mut image = Image::gen_image_color(w as u16, h as u16, BLACK);
-
-    // populate random living cells in initial state
-    for cell in cells.iter_mut() {
-        if rand::gen_range(0, 5) == 0 {
-            *cell = CellState::Alive;
+impl CellMatrix {
+    fn new(screen_width: u16, screen_height: u16, cell_size: u16) -> Self {
+        let width = screen_width / cell_size;
+        let height = screen_height / cell_size;
+        CellMatrix {
+            width,
+            height,
+            cell_size,
+            cells: vec![false; (width * height) as usize],
         }
     }
-    let texture = Texture2D::from_image(&image);
-    loop {
-        clear_background(WHITE);
-        let w = image.width();
-        let h = image.height();
 
-        for y in 0..h as i32 {
-            for x in 0..w as i32 {
+    fn cell_is_alive(&self, x: u16, y: u16) -> bool {
+        self.cells[self.ind_for_pos(x, y)]
+    }
+
+    fn ind_for_pos(&self, x: u16, y: u16) -> usize {
+        /* return cell index for a given x,y coordinate
+         * (cells are stored in a 1d vector) */
+        (y * self.width) as usize + x as usize
+    }
+
+    pub fn draw(&self) {
+        for y in 0..self.height as u16 {
+            for x in 0..self.width as u16 {
+                self.draw_cell(x, y);
+            }
+        }
+    }
+
+    fn draw_cell(&self, x: u16, y: u16) {
+        /* draw a rectangle for a given cell reference at the appropriate place in the image*/
+        draw_rectangle(
+            ((x - 1) * self.cell_size).into(),
+            ((y - 1) * self.cell_size).into(),
+            self.cell_size.into(),
+            self.cell_size.into(),
+            if self.cell_is_alive(x, y) {
+                BLACK
+            } else {
+                WHITE
+            },
+        );
+    }
+
+    pub fn step(&mut self) {
+        /* evolve the matrix one step */
+        let mut buffer = self.cells.to_vec();
+        for y in 0..self.height as i32 {
+            for x in 0..self.width as i32 {
                 let mut n_neighbors = 0;
                 // iterate of cell neighbors
                 for j in -1i32..=1 {
                     for i in -1i32..=1 {
                         // out of bounds
-                        if y + j < 0 || y + j >= h as i32 || x + i < 0 || x + i >= w as i32 {
+                        if y + j < 0
+                            || y + j >= self.height as i32
+                            || x + i < 0
+                            || x + i >= self.width as i32
+                        {
                             continue;
                         }
                         // I am not a neighbor of myself
@@ -47,40 +78,52 @@ async fn main() {
                             continue;
                         }
 
-                        let neighbor = cells[(y + j) as usize * w + (x + i) as usize];
-                        if neighbor == CellState::Alive {
+                        //let neighbor = [(y + j) as usize * w + (x + i) as usize];
+                        //TODO: find a way to take a 2d slice of this 1d vector and sum it rather
+                        //than iterating over each point. Rust must have a better matrix library
+                        if self.cell_is_alive((x + i) as u16, (y + j) as u16) {
                             n_neighbors += 1;
                         }
                     }
                 }
 
                 // add new cell state to buffer
-                let current_cell = cells[y as usize * w + x as usize];
-                buffer[y as usize * w + x as usize] = match (current_cell, n_neighbors) {
-                    (CellState::Alive, x) if x < 2 => CellState::Dead, // Rule 1: live cell with < 2 neighbors dies
-                    (CellState::Alive, 2) | (CellState::Alive, 3) => CellState::Alive, // Rule 2: live cell with 2-3 neighbors survives
-                    (CellState::Alive, x) if x > 3 => CellState::Dead, // Rule 3: live cell with >3 neighbors dies
-                    (CellState::Dead, 3) => CellState::Alive, // Rule 4: dead cell with 3 neighbors becomes alive
-                    (otherwise, _) => otherwise,              // remain in same state
-                };
+                buffer[self.ind_for_pos(x as u16, y as u16)] =
+                    match (self.cell_is_alive(x as u16, y as u16), n_neighbors) {
+                        (true, x) if x < 2 => false, // Rule 1: live cell with < 2 neighbors dies
+                        (true, 2) | (true, 3) => true, // Rule 2: live cell with 2-3 neighbors survives
+                        (true, x) if x > 3 => false,   // Rule 3: live cell with >3 neighbors dies
+                        (false, 3) => true, // Rule 4: dead cell with 3 neighbors becomes alive
+                        (otherwise, _) => otherwise, // remain in same state
+                    };
             }
         }
+        self.cells = buffer;
+    }
+}
 
-        for i in 0..buffer.len() {
-            cells[i] = buffer[i];
+#[macroquad::main("Conbhuide")]
+async fn main() {
+    let mut cell_matrix: CellMatrix =
+        CellMatrix::new(screen_width() as u16, screen_height() as u16, CELL_SIZE);
+    info!(
+        "{} by {} canvas, for {} by {} cells",
+        screen_height(),
+        screen_width(),
+        cell_matrix.height,
+        cell_matrix.width
+    );
 
-            image.set_pixel(
-                (i % w) as u32,
-                (i / w) as u32,
-                match buffer[i as usize] {
-                    CellState::Alive => BLACK,
-                    CellState::Dead => WHITE,
-                },
-            );
+    // populate random living cells in initial state
+    /*for cell in cells.iter_mut() {
+        if rand::gen_range(0, 5) == 0 {
+            *cell = CellState::Alive;
         }
-
-        texture.update(&image);
-        draw_texture(&texture, 0., 0., WHITE);
+    }*/
+    loop {
+        clear_background(WHITE);
+        cell_matrix.step();
+        cell_matrix.draw();
         next_frame().await
     }
 }
