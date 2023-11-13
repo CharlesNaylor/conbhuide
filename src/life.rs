@@ -42,9 +42,10 @@ impl CellMatrix {
 
     fn cell_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
         /* translate a click on the screen to a cell position */
+        info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
             screen_pos.x as u16 / self.cell_size,
-            screen_pos.y as u16 / self.cell_size
+            screen_pos.y as u16 / self.cell_size,
         )
     }
 
@@ -59,8 +60,8 @@ impl CellMatrix {
     fn draw_cell(&self, x: u16, y: u16) {
         /* draw a rectangle for a given cell reference at the appropriate place in the image*/
         draw_rectangle(
-            (((x as i16) - 1) * self.cell_size as i16).into(),
-            (((y as i16) - 1) * self.cell_size as i16).into(),
+            (x * self.cell_size).into(),
+            (y * self.cell_size).into(),
             self.cell_size.into(),
             self.cell_size.into(),
             if self.cell_is_alive(x, y) {
@@ -74,7 +75,11 @@ impl CellMatrix {
     pub fn flip_cell(&mut self, mouse_position: Vec2) {
         let (x, y) = self.cell_pos_for_click(mouse_position);
         let cell_ind = self.ind_for_pos(x, y);
-        self.cells[cell_ind] ^= self.cells[cell_ind];
+        self.cells[cell_ind] = !self.cells[cell_ind];
+        info!(
+            "Called flip_cell on {},{}, making it {}",
+            x, y, self.cells[cell_ind]
+        );
     }
 
     pub fn step(&mut self) {
@@ -113,7 +118,7 @@ impl CellMatrix {
                     match (self.cell_is_alive(x as u16, y as u16), n_neighbors) {
                         (true, x) if x < 2 => false, // Rule 1: live cell with < 2 neighbors dies
                         (true, 2) | (true, 3) => true, // Rule 2: live cell with 2-3 neighbors survives
-                        (true, x) if x > 3 => false, // Rule 3: live cell with >3 neighbors dies
+                        (true, x) if x > 3 => false,   // Rule 3: live cell with >3 neighbors dies
                         (false, 3) => true, // Rule 4: dead cell with 3 neighbors becomes alive
                         (otherwise, _) => otherwise, // remain in same state
                     };
