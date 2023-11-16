@@ -10,6 +10,7 @@ edition = "2018"
 
 [dependencies]
 macroquad = "0.4.4"
+phf = { version = "0.11.2", features = ["macros"] }
 sapp-wasm = "0.1.23"
 
 [dependencies.web-sys]

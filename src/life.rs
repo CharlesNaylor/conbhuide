@@ -1,8 +1,13 @@
 /*
  * Conway's game of life basic implementation. macroquad drawing is in here at the moment, too.
+pub mod celtic;
+mod settings;
+use celtic::{draw_expr_for_tile, Cut, Offset, Tile};
  */
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
+//use settings::Settings;
+
 pub struct CellMatrix {
     pub width: u16,
     pub height: u16,
@@ -12,6 +17,7 @@ pub struct CellMatrix {
 }
 impl CellMatrix {
     pub fn new(screen_size: Vec2, cell_size: u16) -> Self {
+        // subtract 1 from width b/c we are offsetting alternate rows
         let width: u16 = (screen_size.x / cell_size as f32) as u16;
         let height: u16 = (screen_size.y / cell_size as f32) as u16;
         CellMatrix {
@@ -81,6 +87,26 @@ impl CellMatrix {
             x, y, self.cells[cell_ind]
         );
     }
+    /*
+        pub fn tile_for_position(&self, t_x: u16, t_y: u16) -> Tile {
+            /* figure out what the edges are between adjoining points
+             * following the offset matrix strategy for knots
+             * This leads to 36 possible tiles in celtic knots
+             * comprised of 6 rotated component functions
+             *
+             * Tiles are interstitial, so there should be width + 1 and height + 1 total.
+             * Params t_x and t_y refer to the *tile* position
+             *
+             * Also, in conway it's possible to have a pattern with intersecting edges.
+             * i.e. 3 or even 4 "cuts", equivalent to a matrix of {1,1,1,1}
+             * We're ignoring those and will pick one at random (either first)
+             */
+            let first_cut: Cut = match (t_x, t_y) {
+                (0, _) => Cut::Vertical,
+                (_, 0) => Cut::
+            };
+        }
+    */
 
     pub fn step(&mut self) {
         /* evolve the matrix one step */
