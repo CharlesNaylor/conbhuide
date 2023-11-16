@@ -26,6 +26,7 @@ async fn main() {
     //     cell_matrix.width
     // );
     let mut tile_matrix: TileMatrix = TileMatrix::new(screen_size, CELL_SIZE, texture);
+    info!("TileMatrix: width {}, height {}",tile_matrix.width, tile_matrix.height);
 
     let mut running: bool = true;
     let mut show_edges: bool = true;

@@ -69,10 +69,25 @@ impl TileMatrix {
         }
     }
 
+    pub fn spacing(&self) -> u16 {
+        /* return a good value for pixel spacing based on tile_size
+         * e.g., for drawing edge lines */
+        self.tile_size / 10
+    }
+
     fn ind_for_pos(&self, x: u16, y: u16) -> usize {
         /* return tile index for a given x,y coordinate
          * (cells are stored in a 1d vector) */
         (y * (self.width - 1)) as usize + x as usize
+    }
+
+    fn node_ind_for_tile_pos(&self, x: u16, y: u16) -> usize {
+        /* return node index for a given x,y coordinate
+         * (cells are stored in a 1d vector)
+         * recall there are half as many horizontal nodes
+         * as there are tiles
+         */
+        ((y*(self.width/2 + 1)) + (x/2)) as usize
     }
 
     fn node_ind_for_pos(&self, x: u16, y: u16) -> usize {
@@ -81,29 +96,23 @@ impl TileMatrix {
          * recall there are half as many horizontal nodes
          * as there are tiles
          */
-        ((y * (self.width / 2 - 1)) + x / 2) as usize
-    }
-
-    pub fn spacing(&self) -> u16 {
-        /* return a good value for pixel spacing based on tile_size
-         * e.g., for drawing edge lines */
-        self.tile_size / 10
+        ((y*(self.width/2 + 1)) + x ) as usize
     }
 
     pub fn loc_for_node(&self, x: u16, y: u16) -> Vec2 {
         /* return offset position of a node on screen */
         if y % 2 == 0 {
-            vec2((x * self.tile_size).into(), (y * self.tile_size).into())
+            vec2((x * self.tile_size*2).into(), (y * self.tile_size).into())
         } else {
             vec2(
-                ((self.tile_size / 2) + x * self.tile_size).into(),
+                (self.tile_size  + x * self.tile_size*2).into(),
                 (y * self.tile_size).into(),
             )
         }
     }
 
     fn tile_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
-        /* translate a click on the screen to a node position */
+        /* translate a click on the screen to a tile position */
         info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
             screen_pos.x as u16 / self.tile_size,
@@ -111,13 +120,25 @@ impl TileMatrix {
         )
     }
 
+    fn nearest_node_to_click(&self, screen_pos: Vec2) -> (u16, u16) {
+        /* nearest node to click */
+        let y: u16 = (screen_pos.y / self.tile_size as f32).round() as u16;
+        let x: u16 = if y % 2 == 0 {
+            (screen_pos.x / (self.tile_size*2) as f32).round() as u16
+        } else {
+            ((screen_pos.x-self.tile_size as f32) / (self.tile_size*2) as f32).round() as u16
+        };
+        info!("Nearest node to click {},{} is {}, {}", screen_pos.x, screen_pos.y, x, y);
+        (x, y)
+    }
+
     pub fn flip_node(&mut self, mouse_position: Vec2) {
-        let (x, y) = self.tile_pos_for_click(mouse_position);
+        let (x, y) = self.nearest_node_to_click(mouse_position);
         let node_ind = self.node_ind_for_pos(x, y);
         self.nodes[node_ind] = !self.nodes[node_ind];
         info!(
-            "Called flip_node on {},{}, making it {}",
-            x, y, self.nodes[node_ind]
+            "Called flip_node on {},{}, index {}, making it {}",
+            x, y, node_ind, self.nodes[node_ind]
         );
     }
 
@@ -174,7 +195,7 @@ impl TileMatrix {
             let node_color: Color = if y % 2 == 0 { RED } else { BLUE };
             for x in 0..(self.width / 2 + 1) {
                 let node_loc: Vec2 = self.loc_for_node(x, y);
-                if self.nodes[self.ind_for_pos(x, y)] {
+                if self.nodes[self.node_ind_for_pos(x, y)] {
                     draw_circle(
                         node_loc.x,
                         node_loc.y,
@@ -186,8 +207,9 @@ impl TileMatrix {
                 }
                 //edges
                 for (next_x, next_y) in [(x + 1, y), (x, y + 2)] {
-                    if (self.nodes[self.ind_for_pos(x, y)])
-                        && (self.nodes[self.ind_for_pos(next_x, next_y)])
+                    // node_ind_for_pos uses tiles. we're iterating over nodes here
+                    if (self.nodes[self.node_ind_for_pos(x, y)])
+                        && (self.nodes[self.node_ind_for_pos(next_x, next_y)])
                     {
                         let node_loc_end: Vec2 = self.loc_for_node(next_x, next_y);
                         draw_line(
