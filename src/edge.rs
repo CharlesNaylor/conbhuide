@@ -70,9 +70,18 @@ impl TileMatrix {
     }
 
     fn ind_for_pos(&self, x: u16, y: u16) -> usize {
-        /* return cell index for a given x,y coordinate
+        /* return tile index for a given x,y coordinate
          * (cells are stored in a 1d vector) */
         (y * (self.width - 1)) as usize + x as usize
+    }
+
+    fn node_ind_for_pos(&self, x: u16, y: u16) -> usize {
+        /* return node index for a given x,y coordinate
+         * (cells are stored in a 1d vector)
+         * recall there are half as many horizontal nodes
+         * as there are tiles
+         */
+        ((y * (self.width / 2 - 1)) + x / 2) as usize
     }
 
     pub fn spacing(&self) -> u16 {
@@ -93,7 +102,7 @@ impl TileMatrix {
         }
     }
 
-    fn node_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
+    fn tile_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
         /* translate a click on the screen to a node position */
         info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
@@ -103,8 +112,8 @@ impl TileMatrix {
     }
 
     pub fn flip_node(&mut self, mouse_position: Vec2) {
-        let (x, y) = self.node_pos_for_click(mouse_position);
-        let node_ind = self.ind_for_pos(x, y);
+        let (x, y) = self.tile_pos_for_click(mouse_position);
+        let node_ind = self.node_ind_for_pos(x, y);
         self.nodes[node_ind] = !self.nodes[node_ind];
         info!(
             "Called flip_node on {},{}, making it {}",
