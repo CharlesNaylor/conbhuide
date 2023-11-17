@@ -15,11 +15,11 @@ static TILE_LOCS: Map<&'static str, (u16, u16)> = phf_map! {
     "corner" => (0, 0),
     "vertical_line" => (7,1),
     "straight_cross" => (0,2),
-    "curved_cross" => (5,9),
+    "curved_cross" => (6,8),
     "curved_cross_under" => (8,0),
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Cut {
     Open,
     Horizontal,
@@ -27,15 +27,16 @@ pub enum Cut {
     Cross,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Offset {
     Even,
     Odd,
 }
 
+#[derive(Debug)]
 pub struct Tile {
-    pub first_cut: Cut,
-    pub second_cut: Cut,
+    pub bottom_cut: Cut,
+    pub top_cut: Cut,
     pub row_offset: Offset,
     pub col_offset: Offset,
 }
@@ -53,7 +54,7 @@ fn draw_tile(
         texture,
         top_left.x,
         top_left.y,
-        BLACK,
+        WHITE,
         DrawTextureParams {
             source: Some(Rect::new(
                 (loc.0 * tile_size).into(),
@@ -78,10 +79,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
      */
     match tile {
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
         } => {
             //drawStraightCross
             draw_tile(
@@ -95,10 +96,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(drawStraightCross, 90)"
             draw_tile(
@@ -112,10 +113,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(drawStraightCross, 180)"
             draw_tile(
@@ -129,10 +130,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
         } => {
             //"rotate(drawStraightCross, 270)"
             draw_tile(
@@ -146,64 +147,18 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
-        }
-        | Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Vertical,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Vertical,
             row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
-        } => {
-            //drawCorner
-            draw_tile(
-                texture,
-                top_left,
-                TILE_LOCS["corner"],
-                0.0,
-                tile_size,
-                false,
-                false,
-            );
-        }
-        Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Even,
             col_offset: Offset::Odd,
         }
         | Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
-        } => {
-            //"rotate(drawCorner, 90)"
-            draw_tile(
-                texture,
-                top_left,
-                TILE_LOCS["corner"],
-                PI / 2.0,
-                tile_size,
-                false,
-                false,
-            );
-        }
-        Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Horizontal,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Vertical,
             row_offset: Offset::Even,
             col_offset: Offset::Even,
-        }
-        | Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
         } => {
-            //"rotate(drawCorner, 180)"
+            //drawCorner NB: the corner tile I'm using is upside down
             draw_tile(
                 texture,
                 top_left,
@@ -215,18 +170,18 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
-        }
-        | Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Horizontal,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Vertical,
             row_offset: Offset::Odd,
             col_offset: Offset::Even,
+        }
+        | Tile {
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Vertical,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
-            //"rotate(drawCorner, 270)"
+            //"rotate(drawCorner, 90)"
             draw_tile(
                 texture,
                 top_left,
@@ -238,8 +193,54 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Horizontal,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
+        }
+        | Tile {
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
+        } => {
+            //"rotate(drawCorner, 180)"
+            draw_tile(
+                texture,
+                top_left,
+                TILE_LOCS["corner"],
+                0.0,
+                tile_size,
+                false,
+                false,
+            );
+        }
+        Tile {
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
+        }
+        | Tile {
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
+        } => {
+            //"rotate(drawCorner, 270)"
+            draw_tile(
+                texture,
+                top_left,
+                TILE_LOCS["corner"],
+                PI * 0.5,
+                tile_size,
+                false,
+                false,
+            );
+        }
+        Tile {
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Horizontal,
             ..
         } => {
             // "drawHorizontalLine"
@@ -247,15 +248,15 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
                 texture,
                 top_left,
                 TILE_LOCS["vertical_line"],
-                PI,
+                PI / 2.0,
                 tile_size,
                 false,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Vertical,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Vertical,
             ..
         } => {
             // "drawVerticalLine"
@@ -270,27 +271,27 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
         } => {
             //"drawCurvedCross"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                0.0,
+                PI,
                 tile_size,
                 false,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
         } => {
             //"drawCurvedCrossUnder"
             draw_tile(
@@ -304,10 +305,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
         } => {
             //"flipHorizontally(drawCurvedCrossUnder)"
             draw_tile(
@@ -321,27 +322,27 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Vertical,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Vertical,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
             //"flipHorizontally(drawCurvedCross)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                0.0,
+                PI,
                 tile_size,
                 true,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Vertical,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(drawCurvedCrossUnder, 180)"
             draw_tile(
@@ -355,44 +356,44 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Vertical,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
         } => {
             //"rotate(flipHorizontally(drawCurvedCross), 180)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI,
+                0.0,
                 tile_size,
                 true,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Vertical,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
         } => {
             //"rotate(drawCurvedCross, 180)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI,
+                0.0,
                 tile_size,
                 false,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Vertical,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Vertical,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(flipHorizontally(drawCurvedCrossUnder), 180)"
             draw_tile(
@@ -406,27 +407,27 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(flipHorizontally(drawCurvedCross), 90)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI / 2.0,
+                PI*1.5,
                 tile_size,
                 true,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Open,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Open,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
         } => {
             //"rotate(drawCurvedCrossUnder, 270)"
             draw_tile(
@@ -440,10 +441,10 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
         } => {
             //"rotate(flipHorizontally(drawCurvedCrossUnder), 90)"
             draw_tile(
@@ -457,27 +458,27 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Horizontal,
-            second_cut: Cut::Open,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Horizontal,
+            top_cut: Cut::Open,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(drawCurvedCross, 270)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI * 1.5,
+                PI * 0.5,
                 tile_size,
                 false,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Even,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(flipHorizontally(drawCurvedCrossUnder), 270)"
             draw_tile(
@@ -491,44 +492,44 @@ pub fn draw_expr_for_tile(texture: &Texture2D, tile: Tile, top_left: Vec2, tile_
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Even,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Odd,
+            col_offset: Offset::Even,
         } => {
             //"rotate(drawCurvedCross, 90)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI / 2.0,
+                PI * 1.5,
                 tile_size,
                 false,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Odd,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Even,
+            col_offset: Offset::Even,
         } => {
             //"rotate(flipHorizontally(drawCurvedCross), 270)"
             draw_tile(
                 texture,
                 top_left,
                 TILE_LOCS["curved_cross"],
-                PI * 1.5,
+                PI * 0.5,
                 tile_size,
                 true,
                 false,
             );
         }
         Tile {
-            first_cut: Cut::Open,
-            second_cut: Cut::Horizontal,
-            row_offset: Offset::Odd,
-            col_offset: Offset::Even,
+            bottom_cut: Cut::Open,
+            top_cut: Cut::Horizontal,
+            row_offset: Offset::Even,
+            col_offset: Offset::Odd,
         } => {
             //"rotate(drawCurvedCrossUnder, 90)"
             draw_tile(

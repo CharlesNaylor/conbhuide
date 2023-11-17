@@ -9,6 +9,7 @@ use crate::life::CellMatrix;
 use macroquad::input;
 use macroquad::prelude::*;
 use macroquad::ui::{hash, root_ui, widgets::Window};
+use std::f32::consts::PI;
 
 const CELL_SIZE: u16 = 25;
 
@@ -51,8 +52,15 @@ async fn main() {
 
         if is_mouse_button_pressed(MouseButton::Left) {
             //cell_matrix.flip_cell(Vec2::from(mouse_position()));
-            tile_matrix.flip_node(Vec2::from(mouse_position()));
+            let mouse_pos = Vec2::from(mouse_position());
+            tile_matrix.flip_node(mouse_pos);
         }
+        if is_mouse_button_pressed(MouseButton::Right) {
+            let mouse_pos = Vec2::from(mouse_position());
+            let (tile_x, tile_y) = tile_matrix.tile_pos_for_click(mouse_pos);
+            info!("clicked on tile {}, {}:\n\t{:?}",tile_x, tile_y, tile_matrix.tile_for_pos(tile_x, tile_y)); 
+        }
+
         /*
         if running {
             cell_matrix.step();
@@ -63,6 +71,8 @@ async fn main() {
         if show_edges {
             tile_matrix.draw_edges();
         }
+        //tile_matrix.draw_texture();
+
         next_frame().await
     }
 }

@@ -64,9 +64,13 @@ impl TileMatrix {
             height,
             tile_size,
             nodes: vec![false; ((width / 2 + 1) * (height + 1)) as usize],
-            edges: vec![Cut::Cross; (width * height) as usize],
+            edges: vec![Cut::Cross; ((width/2 + 1) * (height + 1)) as usize],
             texture,
         }
+    }
+
+    pub fn draw_texture(&self) {
+        draw_texture(&self.texture, 0.0, 0.0, WHITE);
     }
 
     pub fn spacing(&self) -> u16 {
@@ -79,15 +83,6 @@ impl TileMatrix {
         /* return tile index for a given x,y coordinate
          * (cells are stored in a 1d vector) */
         (y * (self.width - 1)) as usize + x as usize
-    }
-
-    fn node_ind_for_tile_pos(&self, x: u16, y: u16) -> usize {
-        /* return node index for a given x,y coordinate
-         * (cells are stored in a 1d vector)
-         * recall there are half as many horizontal nodes
-         * as there are tiles
-         */
-        ((y*(self.width/2 + 1)) + (x/2)) as usize
     }
 
     fn node_ind_for_pos(&self, x: u16, y: u16) -> usize {
@@ -111,7 +106,12 @@ impl TileMatrix {
         }
     }
 
-    fn tile_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
+    pub fn loc_for_tile(&self, x: u16, y: u16) -> Vec2 {
+        /* return position of a tile on screen */
+            vec2((x * self.tile_size).into(), (y * self.tile_size).into())
+    }
+
+    pub fn tile_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
         /* translate a click on the screen to a tile position */
         info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
@@ -147,42 +147,150 @@ impl TileMatrix {
         for x in 0..self.width {
             for y in 0..self.height {
                 let tile: Tile = self.tile_for_pos(x, y);
-                let top_left: Vec2 = self.loc_for_node(x, y);
+                let top_left: Vec2 = self.loc_for_tile(x, y);
                 draw_expr_for_tile(&self.texture, tile, top_left, self.tile_size);
             }
         }
     }
 
-    fn tile_for_pos(&self, x: u16, y: u16) -> Tile {
+    pub fn tile_for_pos(&self, x: u16, y: u16) -> Tile {
         /* instantiate a tile based on information about nearby edges */
         // note these are odd and even as if things were 1-indexed
-        let row_odd: bool = (y + 1) % 2 == 1;
-        let col_odd: bool = (x + 1) % 2 == 1;
-        let row_offset: Offset = if row_odd { Offset::Odd } else { Offset::Even };
-        let col_offset: Offset = if col_odd { Offset::Odd } else { Offset::Even };
-        let first_cut: Cut;
-        let second_cut: Cut;
-        (first_cut, second_cut) = match (col_odd, row_odd) {
-            (true, ..) => (Cut::Open, Cut::Open),     // y+1, x/2  &  y, x/2
-            (false, true) => (Cut::Open, Cut::Open),  // y+1, (x+1)/2  &  y, (x-1)/2
-            (false, false) => (Cut::Open, Cut::Open), // y+1, (x-1)/2  &  y, (x+1)/2
-        };
+        let row_offset: Offset = if y % 2 == 1 { Offset::Odd } else { Offset::Even };
+        let col_offset: Offset = if x % 2 == 1 { Offset::Odd } else { Offset::Even };
+//        let bottom_cut: Cut;
+//        let top_cut: Cut;
+//        (bottom_cut, top_cut) = match (col_odd, row_odd) {
+//            (true, ..) => {
+//                (Cut::Open, Cut::Open)  // y+1, x/2  &  y, x/2
+//            },
+//            (false, true) => (Cut::Open, Cut::Open),  // y+1, (x+1)/2  &  y, (x-1)/2
+//            (false, false) => (Cut::Open, Cut::Open), // y+1, (x-1)/2  &  y, (x+1)/2
+//        };
         Tile {
-            first_cut,
-            second_cut,
+            bottom_cut: self.cut_for_tile(x, y, &row_offset, &col_offset, true),
+            top_cut: self.cut_for_tile(x, y, &row_offset, &col_offset, false),
             row_offset,
             col_offset,
         }
     }
 
-    pub fn calc_edges(&mut self) {
-        /* calculate edges based on nodes */
-        for x in 0..self.width {
-            for y in 0..self.height {
-                let ind = self.ind_for_pos(x, y); // necessary b/c of something about borrowing
-                                                  // muts
-                self.edges[ind] = Cut::Cross; // TODO: add logic
+    fn cut_for_tile(&self, x: u16, y: u16, row_offset: &Offset, col_offset: &Offset, is_bottom: bool) -> Cut {
+        /* get bottom-most cut on a tile */
+        let n_x: u16 = (x as f32 / 2.0).round() as u16;
+        let vert_exists: bool;
+        let hori_exists: bool;
+        let (vert_exists, hori_exists) = match (is_bottom, row_offset, col_offset) {
+            (true, Offset::Even, Offset::Even) => {
+                if (y +2) > self.height {
+                    vert_exists = false;
+                } else {
+                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
+                }
+                if ((y+1) > self.height) | (n_x == 0) {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (true, Offset::Odd, Offset::Even) => {
+                if (y +2) > self.height {
+                    vert_exists = false;
+                } else {
+                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
+                }
+                if ((y+1) > self.height) | ((n_x +1) > self.width) {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x+1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (true, Offset::Odd, Offset::Odd) => {
+                if ((y +2) > self.height) | (n_x == 0) {
+                    vert_exists = false;
+                } else {
+                    vert_exists= self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x-1,y+2)];
+                }
+                if (y+1) > self.height {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (true, ..)=> {
+                if (y +2) > self.height {
+                    vert_exists = false;
+                } else {
+                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
+                }
+                if ((y+1) > self.height) | (n_x == 0) {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (false, Offset::Even, Offset::Even) => {
+                if ((y +1) > self.height) | (y == 0) {
+                    vert_exists = false;
+                } else {
+                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
+                }
+                if (n_x+1) > self.width / 2 {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x+1,y)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (false, Offset::Odd, Offset::Odd) => {
+                if ((y +1) > self.height) | (y == 0) {
+                    vert_exists = false;
+                } else {
+                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
+                }
+                if n_x == 0 {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
+                }
+                (vert_exists, hori_exists)
+            },
+            (false, Offset::Even, Offset::Odd) => {
+                if ((y +1) > self.height) | (y == 0) | (n_x == 0) {
+                    vert_exists = false;
+                } else {
+                    vert_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x-1,y-1)];
+                }
+                if n_x == 0 {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
+                }
+                (vert_exists, hori_exists)
             }
+            (false, Offset::Odd, Offset::Even) => {
+                if ((y +1) > self.height) | (y == 0) {
+                    vert_exists = false;
+                } else {
+                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
+                }
+                if n_x == 0 {
+                    hori_exists = false;
+                } else {
+                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
+                }
+                (vert_exists, hori_exists)
+            }
+        };
+        match (vert_exists, hori_exists) {
+            (true, true) => Cut::Cross,
+            (true, false) => Cut::Vertical,
+            (false, true) => Cut::Horizontal,
+            (false, false) => Cut::Open
         }
     }
 
