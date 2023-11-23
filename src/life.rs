@@ -87,26 +87,6 @@ impl CellMatrix {
             x, y, self.cells[cell_ind]
         );
     }
-    /*
-        pub fn tile_for_position(&self, t_x: u16, t_y: u16) -> Tile {
-            /* figure out what the edges are between adjoining points
-             * following the offset matrix strategy for knots
-             * This leads to 36 possible tiles in celtic knots
-             * comprised of 6 rotated component functions
-             *
-             * Tiles are interstitial, so there should be width + 1 and height + 1 total.
-             * Params t_x and t_y refer to the *tile* position
-             *
-             * Also, in conway it's possible to have a pattern with intersecting edges.
-             * i.e. 3 or even 4 "cuts", equivalent to a matrix of {1,1,1,1}
-             * We're ignoring those and will pick one at random (either first)
-             */
-            let first_cut: Cut = match (t_x, t_y) {
-                (0, _) => Cut::Vertical,
-                (_, 0) => Cut::
-            };
-        }
-    */
 
     pub fn step(&mut self) {
         /* evolve the matrix one step */

@@ -44,13 +44,15 @@
 use crate::celtic::{draw_expr_for_tile, Cut, Offset, Tile};
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
+use std::collections::HashSet;
+use std::cmp::max;
 
 pub struct TileMatrix {
     pub width: u16,
     pub height: u16,
     tile_size: u16,
     nodes: Vec<bool>,
-    edges: Vec<Cut>,
+    pub edges: HashSet<((i16, i16),(i16,i16))>,
     texture: Texture2D,
 }
 impl TileMatrix {
@@ -64,7 +66,7 @@ impl TileMatrix {
             height,
             tile_size,
             nodes: vec![false; ((width / 2 + 1) * (height + 1)) as usize],
-            edges: vec![Cut::Cross; ((width/2 + 1) * (height + 1)) as usize],
+            edges: HashSet::new(),
             texture,
         }
     }
@@ -120,26 +122,51 @@ impl TileMatrix {
         )
     }
 
-    fn nearest_node_to_click(&self, screen_pos: Vec2) -> (u16, u16) {
-        /* nearest node to click */
-        let y: u16 = (screen_pos.y / self.tile_size as f32).round() as u16;
-        let x: u16 = if y % 2 == 0 {
-            (screen_pos.x / (self.tile_size*2) as f32).round() as u16
+    fn nearest_edge_to_click(&self, screen_pos: Vec2) -> ((u16, u16), (u16, u16)) {
+        /* nearest pair of nodes (constituting an edge) to click */
+        let y_ft: f32 = screen_pos.y / self.tile_size as f32;
+        let y_1: u16 = y_ft.round() as u16;
+        let x_ft: f32 = if y_1 % 2 == 0 {
+            screen_pos.x / (self.tile_size*2) as f32
         } else {
-            ((screen_pos.x-self.tile_size as f32) / (self.tile_size*2) as f32).round() as u16
+            (screen_pos.x-self.tile_size as f32) / (self.tile_size*2) as f32
         };
-        info!("Nearest node to click {},{} is {}, {}", screen_pos.x, screen_pos.y, x, y);
-        (x, y)
+        let x_1: u16 = x_ft.round() as u16;
+
+        let x_dist = x_ft - x_1 as f32;
+        let y_dist = y_ft - y_1 as f32;
+
+        let (x_2, y_2) = if x_dist >= y_dist {
+            (max(0,(x_1 as i16) + if x_dist >= 0.0 {1} else {-1}) as u16,
+            y_1)
+        } else {
+            (x_1,
+            max(0,(y_1 as i16) + if y_dist >= 0.0 {2} else {-2}) as u16)
+        };
+        // So that's the nearest node. The second node will be whichever one
+        info!("Nearest node to click {},{} is {}, {}", screen_pos.x, screen_pos.y, x_1, y_1);
+        ((x_1, y_1), (x_2,y_2))
     }
 
-    pub fn flip_node(&mut self, mouse_position: Vec2) {
-        let (x, y) = self.nearest_node_to_click(mouse_position);
-        let node_ind = self.node_ind_for_pos(x, y);
-        self.nodes[node_ind] = !self.nodes[node_ind];
-        info!(
-            "Called flip_node on {},{}, index {}, making it {}",
-            x, y, node_ind, self.nodes[node_ind]
-        );
+    pub fn flip_edge(&mut self, mouse_position: Vec2) {
+        // TODO: need a data structure that's indifferent to the order in which the edges are
+        // stored
+        let node_pair_u = self.nearest_edge_to_click(mouse_position);
+        let node_pair = ((node_pair_u.0.0 as i16, node_pair_u.0.1 as i16), (node_pair_u.1.0 as i16, node_pair_u.1.1 as i16));
+        let mut node_pair_rev = node_pair.clone();
+        node_pair_rev = ((node_pair_rev.1.0, node_pair_rev.1.1), (node_pair_rev.0.0, node_pair_rev.0.1));
+
+        let add_rem: &str;
+        if self.edges.contains(&node_pair) {
+            add_rem = "Removed";
+            self.edges.remove(&node_pair);
+            self.edges.remove(&node_pair_rev);
+        } else {
+            add_rem = "Added";
+            self.edges.insert(node_pair);
+            self.edges.insert(node_pair_rev);
+        }
+        info!("{} edge at {:?}", add_rem, node_pair);
     }
 
     pub fn draw_tiles(&self) {
@@ -158,15 +185,6 @@ impl TileMatrix {
         // note these are odd and even as if things were 1-indexed
         let row_offset: Offset = if y % 2 == 1 { Offset::Odd } else { Offset::Even };
         let col_offset: Offset = if x % 2 == 1 { Offset::Odd } else { Offset::Even };
-//        let bottom_cut: Cut;
-//        let top_cut: Cut;
-//        (bottom_cut, top_cut) = match (col_odd, row_odd) {
-//            (true, ..) => {
-//                (Cut::Open, Cut::Open)  // y+1, x/2  &  y, x/2
-//            },
-//            (false, true) => (Cut::Open, Cut::Open),  // y+1, (x+1)/2  &  y, (x-1)/2
-//            (false, false) => (Cut::Open, Cut::Open), // y+1, (x-1)/2  &  y, (x+1)/2
-//        };
         Tile {
             bottom_cut: self.cut_for_tile(x, y, &row_offset, &col_offset, true),
             top_cut: self.cut_for_tile(x, y, &row_offset, &col_offset, false),
@@ -177,113 +195,56 @@ impl TileMatrix {
 
     fn cut_for_tile(&self, x: u16, y: u16, row_offset: &Offset, col_offset: &Offset, is_bottom: bool) -> Cut {
         /* get bottom-most cut on a tile */
-        let n_x: u16 = (x as f32 / 2.0).round() as u16;
-        let vert_exists: bool;
-        let hori_exists: bool;
+        let n_x: i16 = (x as f32 / 2.0).round() as i16;
+        let n_y: i16 = y as i16;
         let (vert_exists, hori_exists) = match (is_bottom, row_offset, col_offset) {
             (true, Offset::Even, Offset::Even) => {
-                if (y +2) > self.height {
-                    vert_exists = false;
-                } else {
-                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
-                }
-                if ((y+1) > self.height) | (n_x == 0) {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x,n_y),(n_x,n_y+2))),
+                    self.edges.contains(&((n_x-1,n_y+1),(n_x,n_y+1)))
+                )
             },
             (true, Offset::Odd, Offset::Even) => {
-                if (y +2) > self.height {
-                    vert_exists = false;
-                } else {
-                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
-                }
-                if ((y+1) > self.height) | ((n_x +1) > self.width) {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x+1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x,n_y),(n_x,n_y+2))),
+                    self.edges.contains(&((n_x,n_y+1),(n_x+1,n_y+1))),
+                )
             },
             (true, Offset::Odd, Offset::Odd) => {
-                if ((y +2) > self.height) | (n_x == 0) {
-                    vert_exists = false;
-                } else {
-                    vert_exists= self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x-1,y+2)];
-                }
-                if (y+1) > self.height {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x-1,n_y),(n_x-1,n_y+2))),
+                    self.edges.contains(&((n_x-1,n_y+1),(n_x,n_y+1)))
+                )
             },
-            (true, ..)=> {
-                if (y +2) > self.height {
-                    vert_exists = false;
-                } else {
-                    vert_exists= self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x,y+2)];
-                }
-                if ((y+1) > self.height) | (n_x == 0) {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y+1)];
-                }
-                (vert_exists, hori_exists)
+            (true, Offset::Even, Offset::Odd) => {
+                (
+                    self.edges.contains(&((n_x,n_y),(n_x,n_y+2))),
+                    self.edges.contains(&((n_x-1,n_y+1),(n_x,n_y+1)))
+                )
             },
             (false, Offset::Even, Offset::Even) => {
-                if ((y +1) > self.height) | (y == 0) {
-                    vert_exists = false;
-                } else {
-                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
-                }
-                if (n_x+1) > self.width / 2 {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x,y)] & self.nodes[self.node_ind_for_pos(n_x+1,y)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x,n_y-1), (n_x,n_y+1))),
+                    self.edges.contains(&((n_x,n_y),(n_x+1,n_y)))
+                )
             },
             (false, Offset::Odd, Offset::Odd) => {
-                if ((y +1) > self.height) | (y == 0) {
-                    vert_exists = false;
-                } else {
-                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
-                }
-                if n_x == 0 {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x,n_y-1),(n_x,n_y+1))),
+                    self.edges.contains(&((n_x-1,n_y),(n_x,n_y)))
+                )
             },
             (false, Offset::Even, Offset::Odd) => {
-                if ((y +1) > self.height) | (y == 0) | (n_x == 0) {
-                    vert_exists = false;
-                } else {
-                    vert_exists = self.nodes[self.node_ind_for_pos(n_x-1,y+1)] & self.nodes[self.node_ind_for_pos(n_x-1,y-1)];
-                }
-                if n_x == 0 {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x-1,n_y-1), (n_x-1,n_y+1))),
+                    self.edges.contains(&((n_x-1,n_y), (n_x,n_y)))
+                )
             }
             (false, Offset::Odd, Offset::Even) => {
-                if ((y +1) > self.height) | (y == 0) {
-                    vert_exists = false;
-                } else {
-                    vert_exists = self.nodes[self.node_ind_for_pos(n_x,y+1)] & self.nodes[self.node_ind_for_pos(n_x,y-1)];
-                }
-                if n_x == 0 {
-                    hori_exists = false;
-                } else {
-                    hori_exists = self.nodes[self.node_ind_for_pos(n_x-1,y)] & self.nodes[self.node_ind_for_pos(n_x,y)];
-                }
-                (vert_exists, hori_exists)
+                (
+                    self.edges.contains(&((n_x,n_y-1), (n_x,n_y+1))),
+                    self.edges.contains(&((n_x-1,n_y), (n_x,n_y)))
+                )
             }
         };
         match (vert_exists, hori_exists) {
@@ -303,34 +264,23 @@ impl TileMatrix {
             let node_color: Color = if y % 2 == 0 { RED } else { BLUE };
             for x in 0..(self.width / 2 + 1) {
                 let node_loc: Vec2 = self.loc_for_node(x, y);
-                if self.nodes[self.node_ind_for_pos(x, y)] {
-                    draw_circle(
-                        node_loc.x,
-                        node_loc.y,
-                        1.5 * self.spacing() as f32,
-                        node_color,
-                    );
-                } else {
-                    draw_circle(node_loc.x, node_loc.y, self.spacing().into(), node_color);
-                }
-                //edges
-                for (next_x, next_y) in [(x + 1, y), (x, y + 2)] {
-                    // node_ind_for_pos uses tiles. we're iterating over nodes here
-                    if (self.nodes[self.node_ind_for_pos(x, y)])
-                        && (self.nodes[self.node_ind_for_pos(next_x, next_y)])
-                    {
-                        let node_loc_end: Vec2 = self.loc_for_node(next_x, next_y);
-                        draw_line(
-                            node_loc.x,
-                            node_loc.y,
-                            node_loc_end.x,
-                            node_loc_end.y,
-                            (self.spacing() - 1).into(),
-                            WHITE,
-                        );
-                    }
-                }
+                draw_circle(node_loc.x, node_loc.y, self.spacing().into(), node_color);
             }
         }
-    }
-}
+
+        //edges
+        for edge in self.edges.iter() {
+            let node_loc = self.loc_for_node(edge.0.0 as u16, edge.0.1 as u16);
+            let node_loc_end = self.loc_for_node(edge.1.0 as u16, edge.1.1 as u16);
+            draw_line(
+                node_loc.x,
+                node_loc.y,
+                node_loc_end.x,
+                node_loc_end.y,
+                (self.spacing() - 1).into(),
+                WHITE,
+            );
+        }
+
+            }
+        }
