@@ -58,6 +58,11 @@ async fn main() {
             if running {
                 cell_matrix.step();
             }
+            if is_mouse_button_pressed(MouseButton::Left) {
+                //cell_matrix.flip_cell(Vec2::from(mouse_position()));
+                let mouse_pos = Vec2::from(mouse_position());
+                cell_matrix.flip_cell(mouse_pos);
+            }
             cell_matrix.draw();
         } else {
             if is_mouse_button_pressed(MouseButton::Left) {
