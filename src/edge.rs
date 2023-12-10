@@ -260,7 +260,7 @@ impl TileMatrix {
          * draw dots for even and odd rows,
          * add edges
          */
-        for y in 0..(self.height - 1) {
+        for y in 0..self.height {
             let node_color: Color = if y % 2 == 0 { RED } else { BLUE };
             for x in 0..(self.width / 2 + 1) {
                 let node_loc: Vec2 = self.loc_for_node(x, y);
@@ -281,6 +281,19 @@ impl TileMatrix {
                 WHITE,
             );
         }
+    }
 
+    pub fn add_all_edges(&self) {
+        // put every possible edge in.
+        // This is the probable beginning state
+        let all_edges = Vec<((i16, i16), (i16, i16))> = ((0..self.height), (0..self.width)).map(|y,x| {
+            ((x,y),(x+1,y))
+        }).collect();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let node_pair = ((node_pair_u.0.0 as i16, node_pair_u.0.1 as i16), (node_pair_u.1.0 as i16, node_pair_u.1.1 as i16));
+                let mut node_pair_rev = node_pair.clone();
             }
         }
+    }
+}
