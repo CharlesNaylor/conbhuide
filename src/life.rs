@@ -14,9 +14,10 @@ pub struct CellMatrix {
     cell_size: u16,
     screen_size: Vec2,
     cells: Vec<bool>,
+    frame_top_left: Vec2
 }
 impl CellMatrix {
-    pub fn new(screen_size: Vec2, cell_size: u16) -> Self {
+    pub fn new(screen_size: Vec2, cell_size: u16, frame_top_left: Option<Vec2>) -> Self {
         // subtract 1 from width b/c we are offsetting alternate rows
         let width: u16 = (screen_size.x / cell_size as f32) as u16;
         let height: u16 = (screen_size.y / cell_size as f32) as u16;
@@ -26,6 +27,7 @@ impl CellMatrix {
             cell_size,
             screen_size,
             cells: vec![false; (width * height) as usize],
+            frame_top_left: frame_top_left.unwrap_or(vec2(0.,0.))
         }
     }
 
@@ -50,8 +52,8 @@ impl CellMatrix {
         /* translate a click on the screen to a cell position */
         info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
-            screen_pos.x as u16 / self.cell_size,
-            screen_pos.y as u16 / self.cell_size,
+            (screen_pos.x - self.frame_top_left.x) as u16 / self.cell_size,
+            (screen_pos.y - self.frame_top_left.y) as u16 / self.cell_size,
         )
     }
 
@@ -66,8 +68,8 @@ impl CellMatrix {
     fn draw_cell(&self, x: u16, y: u16) {
         /* draw a rectangle for a given cell reference at the appropriate place in the image*/
         draw_rectangle(
-            (x * self.cell_size).into(),
-            (y * self.cell_size).into(),
+            self.frame_top_left.x + ((x * self.cell_size) as f32),
+            self.frame_top_left.y + ((y * self.cell_size) as f32),
             self.cell_size.into(),
             self.cell_size.into(),
             if self.cell_is_alive(x, y) {

@@ -43,7 +43,6 @@
 */
 use crate::celtic::{draw_expr_for_tile, Cut, Offset, Tile};
 use macroquad::prelude::*;
-use macroquad::rand::gen_range;
 use std::collections::HashSet;
 use std::cmp::max;
 
@@ -54,9 +53,10 @@ pub struct TileMatrix {
     nodes: Vec<bool>,
     pub edges: HashSet<((i16, i16),(i16,i16))>,
     texture: Texture2D,
+    frame_top_left: Vec2
 }
 impl TileMatrix {
-    pub fn new(screen_size: Vec2, tile_size: u16, texture: Texture2D) -> Self {
+    pub fn new(screen_size: Vec2, tile_size: u16, texture: Texture2D, frame_top_left: Option<Vec2>) -> Self {
         let width: u16 = (screen_size.x / tile_size as f32) as u16;
         let height: u16 = (screen_size.y / tile_size as f32) as u16;
         // to make edges, we should have 1 fewer nodes than columns of tiles,
@@ -68,11 +68,12 @@ impl TileMatrix {
             nodes: vec![false; ((width / 2 + 1) * (height + 1)) as usize],
             edges: HashSet::new(),
             texture,
+            frame_top_left: frame_top_left.unwrap_or(vec2(0.,0.))
         }
     }
 
     pub fn draw_texture(&self) {
-        draw_texture(&self.texture, 0.0, 0.0, WHITE);
+        draw_texture(&self.texture, self.frame_top_left.x, self.frame_top_left.y, WHITE);
     }
 
     pub fn spacing(&self) -> u16 {
@@ -99,37 +100,43 @@ impl TileMatrix {
     pub fn loc_for_node(&self, x: u16, y: u16) -> Vec2 {
         /* return offset position of a node on screen */
         if y % 2 == 0 {
-            vec2((x * self.tile_size*2).into(), (y * self.tile_size).into())
+            vec2(
+                self.frame_top_left.x + ((x * self.tile_size*2) as f32),
+                self.frame_top_left.y + ((y * self.tile_size) as f32),
+            )
         } else {
             vec2(
-                (self.tile_size  + x * self.tile_size*2).into(),
-                (y * self.tile_size).into(),
+                self.frame_top_left.x + ((self.tile_size  + x * self.tile_size*2) as f32),
+                self.frame_top_left.y + ((y * self.tile_size) as f32),
             )
         }
     }
 
     pub fn loc_for_tile(&self, x: u16, y: u16) -> Vec2 {
         /* return position of a tile on screen */
-            vec2((x * self.tile_size).into(), (y * self.tile_size).into())
+            vec2(
+                self.frame_top_left.x + ((x * self.tile_size) as f32),
+                self.frame_top_left.y + ((y * self.tile_size) as f32)
+            )
     }
 
     pub fn tile_pos_for_click(&self, screen_pos: Vec2) -> (u16, u16) {
         /* translate a click on the screen to a tile position */
         info!("Screen position {},{}", screen_pos.x, screen_pos.y,);
         (
-            screen_pos.x as u16 / self.tile_size,
-            screen_pos.y as u16 / self.tile_size,
+            (screen_pos.x - self.frame_top_left.x) as u16 / self.tile_size,
+            (screen_pos.y - self.frame_top_left.y) as u16 / self.tile_size,
         )
     }
 
     fn nearest_edge_to_click(&self, screen_pos: Vec2) -> ((u16, u16), (u16, u16)) {
         /* nearest pair of nodes (constituting an edge) to click */
-        let y_ft: f32 = screen_pos.y / self.tile_size as f32;
+        let y_ft: f32 = (screen_pos.y - self.frame_top_left.y) / self.tile_size as f32;
         let y_1: u16 = y_ft.round() as u16;
         let x_ft: f32 = if y_1 % 2 == 0 {
-            screen_pos.x / (self.tile_size*2) as f32
+            (screen_pos.x - self.frame_top_left.x) / (self.tile_size*2) as f32
         } else {
-            (screen_pos.x-self.tile_size as f32) / (self.tile_size*2) as f32
+            (screen_pos.x-self.frame_top_left.x - self.tile_size as f32) / (self.tile_size*2) as f32
         };
         let x_1: u16 = x_ft.round() as u16;
 
@@ -283,10 +290,10 @@ impl TileMatrix {
         }
     }
 
-    pub fn add_all_edges(&self) {
+    /*pub fn add_all_edges(&self) {
         // put every possible edge in.
         // This is the probable beginning state
-        let all_edges = Vec<((i16, i16), (i16, i16))> = ((0..self.height), (0..self.width)).map(|y,x| {
+        let all_edges: Vec<((i16, i16), (i16, i16))> = ((0..self.height), (0..self.width)).map(|y,x| {
             ((x,y),(x+1,y))
         }).collect();
         for y in 0..self.height {
@@ -295,5 +302,5 @@ impl TileMatrix {
                 let mut node_pair_rev = node_pair.clone();
             }
         }
-    }
+    }*/
 }
