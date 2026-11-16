@@ -1,0 +1,4 @@
+# miniquad's GL and windowing functions are imported from js/gl.js when the page loads.
+# Newer Rust toolchains make unresolved wasm symbols a link error unless told otherwise.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--allow-undefined"]
