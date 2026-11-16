@@ -1,50 +1,49 @@
-Initial JS implementation of Celtic Knots comes from https://w-shadow.com/celtic-knots/
+# Conbhuide
 
-## How to install
+A Life-like cellular automaton whose live regions are drawn as Celtic knotwork.
 
-```sh
-npm install
-```
+Every live cell is a vertex; live cells that share a side are joined by an edge, and each edge
+carries one strand crossing. Where a live cell faces a dead one, the strand turns back around
+the cell. This is Mercat's construction applied to the grid, so every state of the automaton
+is a valid knot. The geometry is described at the top of `src/knot.rs`.
 
-## How to run in debug mode
-
-```sh
-# Builds the project and opens it in a new browser tab. Auto-reloads when the project changes.
-npm start
-```
-
-## How to build in release mode
+## Run
 
 ```sh
-# Builds the project and places it into the `dist` folder.
-npm run build
+cargo run --release
 ```
 
-## How to run unit tests
+| Key | Button | Action |
+|---|---|---|
+| `Space` | Pause / Play | pause or resume |
+| `C` | Cells / Knot | switch between the knot and the raw cells |
+| `G` | | show the cells faintly under the knot |
+| `N` | Rule | next rule: Life, Maze, Day & Night, Coral |
+| `R` | Random | random seed |
+| `S` | Symmetric | four-fold symmetric random seed |
+| `P` | | save `conbhuide.png` |
+| click | | flip a cell |
+
+When the pattern stops changing it is reseeded automatically.
+
+## Save a picture without the GUI
 
 ```sh
-# Runs tests in Firefox
-npm test -- --firefox
-
-# Runs tests in Chrome
-npm test -- --chrome
-
-# Runs tests in Safari
-npm test -- --safari
+cargo run -- --snapshot out.png            # hand-placed test figures
+cargo run -- --snapshot out.png maze 40    # Maze rule, fixed seed, 40 generations
 ```
 
-## What does each file do?
+## Tests
 
-* `Cargo.toml` contains the standard Rust metadata. You put your Rust dependencies in here. You must change this file with your details (name, description, version, authors, categories)
+```sh
+cargo test
+```
 
-* `package.json` contains the standard npm metadata. You put your JavaScript dependencies in here. You must change this file with your details (author, name, version)
+## Web build
 
-* `webpack.config.js` contains the Webpack configuration. You shouldn't need to change this, unless you have very special needs.
+```sh
+cargo build --release --target wasm32-unknown-unknown
+cp target/wasm32-unknown-unknown/release/conbhuide.wasm js/
+```
 
-* The `js` folder contains your JavaScript code (`index.js` is used to hook everything into Webpack, you don't need to change it).
-
-* The `src` folder contains your Rust code.
-
-* The `static` folder contains any files that you want copied as-is into the final build. It contains an `index.html` file which loads the `index.js` file.
-
-* The `tests` folder contains your Rust unit tests.
+Then serve the `js` directory and open `conbhuide.html`.
