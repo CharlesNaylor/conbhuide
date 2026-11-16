@@ -111,6 +111,13 @@ impl App {
         }
     }
 
+    fn clear(&mut self) {
+        match self.mode {
+            Mode::Network => self.net.clear(),
+            Mode::Life => self.cells.clear(),
+        }
+    }
+
     fn set_rule(&mut self, index: usize) {
         match self.mode {
             Mode::Network => {
@@ -351,16 +358,18 @@ async fn main() {
         let mut randomize = is_key_pressed(KeyCode::R);
         let mut randomize_symmetric = is_key_pressed(KeyCode::S);
         let mut switch_mode = is_key_pressed(KeyCode::M);
+        let mut clear = is_key_pressed(KeyCode::X);
         let raw_name = if app.mode == Mode::Network { "Graph" } else { "Cells" };
         toggle_view |= root_ui().button(vec2(4., 2.), if app.show_knot { raw_name } else { "Knot" });
         toggle_running |= root_ui().button(vec2(58., 2.), if running { "Pause" } else { "Play" });
         randomize |= root_ui().button(vec2(110., 2.), "Random");
         randomize_symmetric |= root_ui().button(vec2(172., 2.), "Symmetric");
+        clear |= root_ui().button(vec2(254., 2.), "Clear");
         switch_mode |= root_ui().button(
-            vec2(254., 2.),
+            vec2(306., 2.),
             if app.mode == Mode::Network { "Mode: Network" } else { "Mode: Life" },
         );
-        next_rule |= root_ui().button(vec2(364., 2.), format!("Rule: {}", app.rule_name()).as_str());
+        next_rule |= root_ui().button(vec2(416., 2.), format!("Rule: {}", app.rule_name()).as_str());
         root_ui().slider(hash!(), "FPS", 0.5..30.0, &mut fps);
 
         if toggle_view {
@@ -377,6 +386,12 @@ async fn main() {
         }
         if next_rule {
             app.next_rule();
+        }
+        if clear {
+            // pause as well, so the blank board stays blank until something is drawn on it
+            app.clear();
+            running = false;
+            stagnant = 0;
         }
         if randomize {
             app.randomize(false);

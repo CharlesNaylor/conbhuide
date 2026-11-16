@@ -27,6 +27,7 @@ cargo run --release
 | `N` | Rule | next rule for the current mode |
 | `R` | Random | random seed |
 | `S` | Symmetric | mirror-symmetric random seed |
+| `X` | Clear | blank the board and pause, ready for drawing by clicking |
 | `C` | Graph / Cells / Knot | switch between the knot and the raw automaton |
 | `G` | | show the raw automaton faintly under the knot |
 | `J` | | Network: displace the mesh nodes at random, for a hand-drawn look |
