@@ -34,8 +34,6 @@ cargo run --release
 | `P` | | save `conbhuide.png` |
 | click | | flip the nearest edge (Network) or cell (Life) |
 
-When the pattern stops changing it is reseeded automatically.
-
 Network rules: Islands, Lace, Weave, Bloom. Life rules: Life, Maze, Day & Night, Coral.
 `B.../S...` lists the neighbour counts at which an edge or cell is born or survives.
 

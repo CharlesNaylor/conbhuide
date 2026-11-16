@@ -31,8 +31,6 @@ const CELL_SIZE: u16 = 24;
 const NODE_SPACING: f32 = 44.0;
 const JITTER: f32 = 0.14;
 const FRAME_TOP_LEFT: Vec2 = vec2(0., 44.);
-/// reseed after this many steps without change (still life, period-2 oscillator or empty)
-const STAGNANT_STEPS: u32 = 12;
 const FAINT: Color = Color::new(0.2, 0.2, 0.25, 1.0);
 
 fn window_conf() -> Conf {
@@ -328,8 +326,6 @@ async fn main() {
     let mut running: bool = true;
     let mut fps: f32 = 3.0;
     let mut step_time: f64 = 0.0;
-    let mut previous: Vec<bool> = app.state();
-    let mut stagnant: u32 = 0;
 
     let snapshot = snapshot_from_args();
     let mut frames_drawn: u32 = 0;
@@ -391,7 +387,6 @@ async fn main() {
             // pause as well, so the blank board stays blank until something is drawn on it
             app.clear();
             running = false;
-            stagnant = 0;
         }
         if randomize {
             app.randomize(false);
@@ -417,21 +412,8 @@ async fn main() {
 
         // simulation
         if running && get_time() > step_time + (1.0 / fps) as f64 {
-            let before = app.state();
             app.step();
             step_time = get_time();
-            // a display should keep moving: start again once the pattern has settled
-            let now = app.state();
-            if now == before || now == previous {
-                stagnant += 1;
-            } else {
-                stagnant = 0;
-            }
-            previous = before;
-            if stagnant >= STAGNANT_STEPS {
-                app.randomize(true);
-                stagnant = 0;
-            }
         }
 
         app.draw();
