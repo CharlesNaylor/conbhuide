@@ -62,4 +62,10 @@ cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/conbhuide.wasm js/
 ```
 
-Then serve the `js` directory and open `conbhuide.html`.
+Then serve the `js` directory (`python -m http.server -d js`) and open it.
+
+`js/gl.js` is the loader copied from the miniquad crate (`js/gl.js`) and has to match the
+miniquad version in `Cargo.lock`; copy it again after upgrading macroquad.
+
+Pushing to `main` builds and publishes the site to GitHub Pages
+(`.github/workflows/pages.yml`): <https://charlesnaylor.github.io/conbhuide/>

@@ -23,8 +23,7 @@
     <canvas id="glcanvas" tabindex='1'><!-- style="outline: none" height="600" width="600">-->
       Your browser does not support the Canvas.
     </canvas>
-    <script src="https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"></script> <!-- gl.js from miniquad repo (native/sapp-wasm/js/gl.js) -->
-    <!--<script src="https://not-fl3.github.io/miniquad-samples/sapp_jsutils.js"></script> gl.js from miniquad repo (native/sapp-wasm/js/gl.js) -->
+    <script src="gl.js"></script> <!-- copied from the miniquad crate (js/gl.js); must match the miniquad version in Cargo.lock -->
     <!--<script src="celtic.js"></script> Initial JS implementation of Celtic Knots comes from https://w-shadow.com/celtic-knots/ --> 
     <script>load("conbhuide.wasm");</script> <!-- Your compiled wasm file -->
   </body>
