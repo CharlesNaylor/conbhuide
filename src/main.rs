@@ -34,6 +34,8 @@ const JITTER: f32 = 0.14;
 const FRAME_TOP_LEFT: Vec2 = vec2(0., 44.);
 /// fraction of the time between two steps that the knot spends moving
 const MORPH_FRACTION: f32 = 0.8;
+/// the Random seed is this fraction of the rule's usual seed density
+const RANDOM_SPARSENESS: f32 = 0.5;
 const FAINT: Color = Color::new(0.2, 0.2, 0.25, 1.0);
 
 fn window_conf() -> Conf {
@@ -120,9 +122,13 @@ impl App {
         self.morph_from = None;
         match (self.mode, symmetric) {
             (Mode::Network, true) => self.net.randomize_symmetric(None),
-            (Mode::Network, false) => self.net.randomize(None),
+            (Mode::Network, false) => {
+                self.net.randomize(Some(self.net.rule.seed_density * RANDOM_SPARSENESS))
+            }
             (Mode::Life, true) => self.cells.randomize_symmetric(None),
-            (Mode::Life, false) => self.cells.randomize(None),
+            (Mode::Life, false) => {
+                self.cells.randomize(Some(self.cells.rule.seed_density * RANDOM_SPARSENESS))
+            }
         }
     }
 
