@@ -37,12 +37,16 @@ cargo run --release
 Network rules: Islands, Lace, Weave, Bloom. Life rules: Life, Maze, Day & Night, Coral.
 `B.../S...` lists the neighbour counts at which an edge or cell is born or survives.
 
+The knot moves from each state to the next rather than jumping: strands reach out to a new
+crossing or pull back from one that has gone.
+
 ## Save a picture without the GUI
 
 ```sh
 cargo run -- --snapshot out.png net:weave 60       # network rule, fixed seed, 60 generations
 cargo run -- --snapshot out.png net 60 --jitter    # first network rule, displaced nodes
 cargo run -- --snapshot out.png maze 40            # Life-mode rule
+cargo run -- --snapshot out.png net 60 --morph 0.5 # halfway through the last generation
 cargo run -- --snapshot out.png netshapes          # hand-placed test graphs
 cargo run -- --snapshot out.png shapes             # hand-placed Life test figures
 ```

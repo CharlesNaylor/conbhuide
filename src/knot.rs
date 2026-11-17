@@ -15,8 +15,14 @@
  *
  * Over/under: on a horizontal edge the NW-SE strand is on top, on a vertical edge the NE-SW
  * strand is. Following any strand, edge orientation alternates, so over/under does too.
+ *
+ * Animation. Seen from C, each side of a live cell is a curve r(phi) over the 90 degrees
+ * facing that side: constant for an arc, and rising to a point at P for half a crossing.
+ * Between two states r is interpolated, with r = 0 for a dead cell. So a strand that is
+ * about to cross pushes a tip out to P, and a cell being born grows out of its centre.
  */
 use crate::life::CellMatrix;
+use crate::mercat::{draw_ribbon, gap_near_crossing, Curve};
 use macroquad::prelude::*;
 use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, SQRT_2};
 
@@ -126,29 +132,119 @@ fn draw_crossing(p: Vec2, quarter: f32, horizontal_edge: bool, width: f32, gap: 
     draw_segment(p - over, p + over, width, style.strand_color);
 }
 
+/// Draw side `k` of the live cell centred on `center` as it stands.
+fn draw_side(center: Vec2, s: f32, k: usize, side: Side, style: &KnotStyle) {
+    let width = s * style.strand_width;
+    match side {
+        Side::Empty => {}
+        Side::Wall => {
+            draw_quarter_arc(center, s * SQRT_2 / 4.0, k as f32 * FRAC_PI_2, width, style.strand_color);
+        }
+        Side::Cross => {
+            // each edge is shared by two cells: draw it from the west/north one
+            if k < 2 {
+                let (dx, dy) = DIRS[k];
+                let p = center + vec2(dx as f32, dy as f32) * (s / 2.0);
+                draw_crossing(p, s / 4.0, k == 0, width, s * style.gap, style);
+            }
+        }
+    }
+}
+
 pub fn draw_knot(matrix: &CellMatrix, style: &KnotStyle) {
     let s = matrix.cell_size as f32;
-    let width = s * style.strand_width;
-    let gap = s * style.gap;
-    let radius = s * SQRT_2 / 4.0;
     for y in 0..matrix.height {
         for x in 0..matrix.width {
             let sides = sides_for_cell(matrix.cells(), matrix.width, matrix.height, x, y);
             let center = matrix.cell_center(x, y);
             for (k, side) in sides.iter().enumerate() {
-                match side {
-                    Side::Empty => {}
-                    Side::Wall => {
-                        draw_quarter_arc(center, radius, k as f32 * FRAC_PI_2, width, style.strand_color);
-                    }
-                    Side::Cross => {
-                        // each edge is shared by two cells: draw it from the west/north one
-                        if k < 2 {
-                            let (dx, dy) = DIRS[k];
-                            let p = center + vec2(dx as f32, dy as f32) * (s / 2.0);
-                            draw_crossing(p, s / 4.0, k == 0, width, gap, style);
-                        }
-                    }
+                draw_side(center, s, k, *side, style);
+            }
+        }
+    }
+}
+
+/// Distance of the strand from the cell centre, `phi` radians round from the middle of a side.
+fn side_radius(side: Side, s: f32, phi: f32) -> f32 {
+    match side {
+        Side::Empty => 0.0,
+        Side::Wall => s * SQRT_2 / 4.0,
+        Side::Cross => (s / 2.0) / (phi.cos() + phi.abs().sin()),
+    }
+}
+
+/// Side `k` of a cell, part of the way (`t`) from being `from` to being `to`.
+fn draw_side_morph(center: Vec2, s: f32, k: usize, from: Side, to: Side, t: f32, width: f32, color: Color) {
+    const STEPS: usize = 8;
+    let mid_angle = k as f32 * FRAC_PI_2;
+    let point = |phi: f32| {
+        let (r0, r1) = (side_radius(from, s, phi), side_radius(to, s, phi));
+        let angle = mid_angle + phi;
+        center + vec2(angle.cos(), angle.sin()) * (r0 + (r1 - r0) * t)
+    };
+    let strand = |start: f32, end: f32| {
+        let pts = (0..=STEPS)
+            .map(|i| point(start + (end - start) * i as f32 / STEPS as f32))
+            .collect();
+        let curve = Curve::through(pts, None, None);
+        draw_ribbon(&curve, curve.pts.len(), width, color);
+    };
+    if from == Side::Cross || to == Side::Cross {
+        // the strand comes to a point in the middle of the side: round it off
+        strand(-FRAC_PI_4, 0.0);
+        strand(0.0, FRAC_PI_4);
+        let tip = point(0.0);
+        draw_circle(tip.x, tip.y, width / 2.0, color);
+    } else {
+        strand(-FRAC_PI_4, FRAC_PI_4);
+    }
+}
+
+/// The knot part of the way from the cells `previous` (at `t` = 0) to the matrix's current
+/// cells (at `t` = 1).
+pub fn draw_knot_morph(matrix: &CellMatrix, previous: &[bool], t: f32, style: &KnotStyle) {
+    let s = matrix.cell_size as f32;
+    let sides = |cells: &[bool], x: u16, y: u16| sides_for_cell(cells, matrix.width, matrix.height, x, y);
+    // a cell being born or dying is also drawn thinner
+    let width = |x: u16, y: u16| {
+        s * style.strand_width
+            * match (sides(previous, x, y)[0], sides(matrix.cells(), x, y)[0]) {
+                (Side::Empty, _) => t,
+                (_, Side::Empty) => 1.0 - t,
+                _ => 1.0,
+            }
+    };
+    for y in 0..matrix.height {
+        for x in 0..matrix.width {
+            let (from, to) = (sides(previous, x, y), sides(matrix.cells(), x, y));
+            let center = matrix.cell_center(x, y);
+            for k in 0..4 {
+                if from[k] == to[k] {
+                    draw_side(center, s, k, to[k], style);
+                } else {
+                    draw_side_morph(center, s, k, from[k], to[k], t, width(x, y), style.strand_color);
+                }
+            }
+        }
+    }
+    // Where a crossing is forming or coming apart, the two tips are all but touching near
+    // that end of the move: lay the crossing over them there, with its gap opening or closing.
+    for y in 0..matrix.height {
+        for x in 0..matrix.width {
+            let (from, to) = (sides(previous, x, y), sides(matrix.cells(), x, y));
+            for k in 0..2 {
+                let gap = match (from[k], to[k]) {
+                    (Side::Cross, Side::Cross) => 0.0,
+                    (Side::Cross, _) => gap_near_crossing(1.0 - t),
+                    (_, Side::Cross) => gap_near_crossing(t),
+                    _ => 0.0,
+                };
+                if gap > 0.0 {
+                    let (dx, dy) = DIRS[k];
+                    let p = matrix.cell_center(x, y) + vec2(dx as f32, dy as f32) * (s / 2.0);
+                    let (nx, ny) = (x + dx as u16, y + dy as u16);
+                    let width = width(x, y).min(width(nx, ny));
+                    draw_crossing(p, s / 4.0, k == 0, width, s * style.gap * gap, style);
                 }
             }
         }
@@ -229,5 +325,16 @@ mod tests {
             sides_for_cell(&cells, 2, 1, 1, 0),
             [Side::Wall, Side::Wall, Side::Cross, Side::Wall]
         );
+    }
+
+    #[test]
+    fn arcs_and_crossings_meet_at_the_corners_of_a_side() {
+        let s = 24.0;
+        for phi in [-FRAC_PI_4, FRAC_PI_4] {
+            let (wall, cross) = (side_radius(Side::Wall, s, phi), side_radius(Side::Cross, s, phi));
+            assert!((wall - cross).abs() < 1e-4);
+        }
+        // and a crossing reaches the middle of the side
+        assert!((side_radius(Side::Cross, s, 0.0) - s / 2.0).abs() < 1e-4);
     }
 }

@@ -15,14 +15,15 @@
  *             a Life rule name prefix such as "life", "maze", "day", "coral"
  *       n:    generations to run before the picture is taken (default 30)
  *       add --jitter to displace the mesh nodes at random
+ *       add --morph <t> to stop part of the way (0 to 1) through the last generation
  */
 pub mod knot;
 pub mod life;
 pub mod mercat;
 pub mod network;
-use crate::knot::{draw_knot, KnotStyle};
+use crate::knot::{draw_knot, draw_knot_morph, KnotStyle};
 use crate::life::{CellMatrix, RULES};
-use crate::mercat::draw_network_knot;
+use crate::mercat::{draw_network_knot, draw_network_knot_morph};
 use crate::network::{Network, NET_RULES};
 use macroquad::prelude::*;
 use macroquad::ui::{hash, root_ui};
@@ -31,6 +32,8 @@ const CELL_SIZE: u16 = 24;
 const NODE_SPACING: f32 = 44.0;
 const JITTER: f32 = 0.14;
 const FRAME_TOP_LEFT: Vec2 = vec2(0., 44.);
+/// fraction of the time between two steps that the knot spends moving
+const MORPH_FRACTION: f32 = 0.8;
 const FAINT: Color = Color::new(0.2, 0.2, 0.25, 1.0);
 
 fn window_conf() -> Conf {
@@ -62,6 +65,10 @@ struct App {
     show_under: bool,
     life_style: KnotStyle,
     net_style: KnotStyle,
+    /// the state before the latest step or click, which the knot is still moving away from
+    morph_from: Option<Vec<bool>>,
+    /// when that step or click happened
+    changed_at: f64,
 }
 
 impl App {
@@ -83,7 +90,15 @@ impl App {
                 gap: 0.05,
                 ..KnotStyle::default()
             },
+            morph_from: None,
+            changed_at: 0.0,
         }
+    }
+
+    /// Call before a change that the knot should move through rather than jump to.
+    fn begin_morph(&mut self) {
+        self.morph_from = Some(self.state());
+        self.changed_at = get_time();
     }
 
     fn state(&self) -> Vec<bool> {
@@ -94,6 +109,7 @@ impl App {
     }
 
     fn step(&mut self) {
+        self.begin_morph();
         match self.mode {
             Mode::Network => self.net.step(),
             Mode::Life => self.cells.step(),
@@ -101,6 +117,7 @@ impl App {
     }
 
     fn randomize(&mut self, symmetric: bool) {
+        self.morph_from = None;
         match (self.mode, symmetric) {
             (Mode::Network, true) => self.net.randomize_symmetric(None),
             (Mode::Network, false) => self.net.randomize(None),
@@ -110,6 +127,7 @@ impl App {
     }
 
     fn clear(&mut self) {
+        self.morph_from = None;
         match self.mode {
             Mode::Network => self.net.clear(),
             Mode::Life => self.cells.clear(),
@@ -149,27 +167,37 @@ impl App {
     }
 
     fn flip(&mut self, pos: Vec2) {
+        self.begin_morph();
         match self.mode {
             Mode::Network => self.net.flip_nearest_edge(pos),
             Mode::Life => self.cells.flip_cell(pos),
         }
     }
 
-    fn draw(&self) {
+    /// `morph` is how far the knot has moved from the previous state to the current one,
+    /// from 0 to 1.
+    fn draw(&self, morph: f32) {
         clear_background(BLACK);
+        let from = self.morph_from.as_deref().filter(|_| morph < 1.0);
         match (self.mode, self.show_knot) {
             (Mode::Network, true) => {
                 if self.show_under {
                     self.net.draw_graph(FAINT, Some(Color::new(0.1, 0.1, 0.12, 1.0)));
                 }
-                draw_network_knot(&self.net, &self.net_style);
+                match from {
+                    Some(from) => draw_network_knot_morph(&self.net, from, morph, &self.net_style),
+                    None => draw_network_knot(&self.net, &self.net_style),
+                }
             }
             (Mode::Network, false) => self.net.draw_graph(WHITE, Some(FAINT)),
             (Mode::Life, true) => {
                 if self.show_under {
                     self.cells.draw(FAINT, None);
                 }
-                draw_knot(&self.cells, &self.life_style);
+                match from {
+                    Some(from) => draw_knot_morph(&self.cells, from, morph, &self.life_style),
+                    None => draw_knot(&self.cells, &self.life_style),
+                }
             }
             (Mode::Life, false) => self.cells.draw(BLACK, Some(WHITE)),
         }
@@ -181,18 +209,25 @@ struct Snapshot {
     what: String,
     steps: u32,
     jitter: bool,
+    morph: f32,
 }
 
 fn snapshot_from_args() -> Option<Snapshot> {
     let mut args: Vec<String> = std::env::args().collect();
     let jitter = args.iter().any(|a| a == "--jitter");
     args.retain(|a| a != "--jitter");
+    let mut morph = 1.0;
+    if let Some(at) = args.iter().position(|a| a == "--morph") {
+        morph = args.get(at + 1).and_then(|s| s.parse().ok()).unwrap_or(0.5);
+        args.drain(at..(at + 2).min(args.len()));
+    }
     let at = args.iter().position(|a| a == "--snapshot")?;
     Some(Snapshot {
         path: args.get(at + 1)?.clone(),
         what: args.get(at + 2).cloned().unwrap_or("net".to_owned()),
         steps: args.get(at + 3).and_then(|s| s.parse().ok()).unwrap_or(30),
         jitter,
+        morph,
     })
 }
 
@@ -342,7 +377,7 @@ async fn main() {
         if let Some(snap) = &snapshot {
             // let the window settle for a couple of frames first
             if frames_drawn >= 3 {
-                save_png(&snap.path, || app.draw());
+                save_png(&snap.path, || app.draw(snap.morph));
                 break;
             }
         }
@@ -376,6 +411,7 @@ async fn main() {
         }
         if switch_mode {
             app.mode = if app.mode == Mode::Network { Mode::Life } else { Mode::Network };
+            app.morph_from = None;
             if !app.state().iter().any(|on| *on) {
                 app.randomize(true);
             }
@@ -401,7 +437,7 @@ async fn main() {
             app.show_under = !app.show_under;
         }
         if is_key_pressed(KeyCode::P) {
-            save_png("conbhuide.png", || app.draw());
+            save_png("conbhuide.png", || app.draw(1.0));
         }
         if is_mouse_button_pressed(MouseButton::Left) {
             let mouse_pos = Vec2::from(mouse_position());
@@ -416,7 +452,15 @@ async fn main() {
             step_time = get_time();
         }
 
-        app.draw();
+        // the knot moves to each new state over most of the time until the next one
+        let morph = match &snapshot {
+            Some(snap) => snap.morph,
+            None => {
+                let m = ((get_time() - app.changed_at) as f32 * fps / MORPH_FRACTION).clamp(0.0, 1.0);
+                m * m * (3.0 - 2.0 * m)
+            }
+        };
+        app.draw(morph);
 
         frames_drawn += 1;
         next_frame().await
